@@ -5,7 +5,7 @@ rm -rf out
 mkdir -p out
 
 # Compilation
-javac -cp "lib/servlet-api.jar" -d out $(find . -name "*.java")
+javac -Xlint -cp "lib/servlet-api.jar" -d out $(find . -name "*.java")
 
 # Vérification
 if [ $? -ne 0 ]; then
