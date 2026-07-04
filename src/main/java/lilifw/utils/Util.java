@@ -1,121 +1,55 @@
 package lilifw.utils;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
+import lilifw.annotation.Controller;
+import lilifw.annotation.UrlMapping;
 
 public class Util {
-    // besoin de 2 fonctions
+    // public static void scanAllAnnotedControllers(String
+    // packageLocation,List<Class<?>> liste_controller) throws Exception{
+    public static void scanAllAnnotedControllers(String packageLocation, Map<String, ControllerMethods> urlToMethods)
+            throws Exception {
 
-    // fonction 1 miparcourir ny classes reetran amina package 1 de mi retourne
-    // liste des classes dans ce package
-    public static List<String> getClassesForPackage(String packageName) {
-        List<String> listClasses = new ArrayList<>();
+        packageLocation = packageLocation.replace(".", "/") + "/controllers";
+        URL url = Thread.currentThread().getContextClassLoader().getResource(packageLocation);
 
-        try {
-            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (url == null) {
+            System.out.println("No controllers package found at: " + packageLocation);
+            return;
+        }
 
-            String path = packageName.replace('.', '/');
-            URL resource = classLoader.getResource(path);
+        File dossier = new File(url.toURI());
 
-            if (resource == null) {
-                return listClasses;
-            }
+        for (File file : dossier.listFiles()) {
+            // recuperer tous les noms de classes
+            if (file.isFile() && file.getName().endsWith(".class")) {
+                // transformer en Nom de classes sans .class
+                String className = packageLocation.replace("/", ".") + "." + file.getName().replace(".class", "");
+                // transformer en Class et verifier si annote controller , si oui ajouter dans
+                // la liste si non continue
+                Class<?> clazz = Class.forName(className);
 
-            File directory = new File(resource.toURI());
-
-            if (!directory.exists()) {
-                return listClasses;
-            }
-
-            File[] files = directory.listFiles();
-
-            if (files != null) {
-                for (File file : files) {
-                    String fileName = file.getName();
-
-                    if (fileName.endsWith(".class")) {
-                        String className = packageName + "."
-                                + fileName.substring(0, fileName.length() - 6);
-
-                        listClasses.add(className);
+                if (clazz.isAnnotationPresent(Controller.class)) {
+                    for (Method method : clazz.getDeclaredMethods()) {
+                        if (method.isAnnotationPresent(UrlMapping.class)) {
+                            String urlMethod = method.getAnnotation(UrlMapping.class).value();
+                            urlToMethods.putIfAbsent(urlMethod, new ControllerMethods(clazz.getName(), method));
+                        }
                     }
                 }
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return listClasses;
-    }
-
-    // fonction 2 mandray anle liste de oe Inn le annotation ho verifiena :
-    // (Controller), de oe niveau inn ( Controlleru , methode , attributs)
-    @SuppressWarnings("unchecked")
-    public static List<String> getAnnotatedClasses(
-            String packageName, 
-            String nomAnnotation,
-            String niveauAnnotation) {
-
-        nomAnnotation = "lilifw.annotation." + nomAnnotation;
-        
-        List<String> listeClasses = getClassesForPackage(packageName);
-
-        List<String> listeClassesAnnotes = new ArrayList<>();
-
-        try {
-            Class<?> annotationClass = Class.forName(nomAnnotation);
-
-            for (String nomClasse : listeClasses) {
-
-                Class<?> clazz = Class.forName(nomClasse);
-
-                boolean trouve = false;
-
-                switch (niveauAnnotation.toLowerCase()) {
-
-                    case "classe":
-                    case "controller":
-                        trouve = clazz.isAnnotationPresent(
-                                (Class<? extends Annotation>) annotationClass);
-                        break;
-
-                    case "methode":
-                        for (Method method : clazz.getDeclaredMethods()) {
-                            if (method.isAnnotationPresent(
-                                    (Class<? extends Annotation>) annotationClass)) {
-                                trouve = true;
-                                break;
-                            }
-                        }
-                        break;
-
-                    case "attribut":
-                        for (Field field : clazz.getDeclaredFields()) {
-                            if (field.isAnnotationPresent(
-                                    (Class<? extends Annotation>) annotationClass)) {
-                                trouve = true;
-                                break;
-                            }
-                        }
-                        break;
+                else {
+                    continue;
                 }
 
-                if (trouve) {
-                    listeClassesAnnotes.add(nomClasse);
-                }
             }
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-
-        return listeClassesAnnotes;
     }
 }
