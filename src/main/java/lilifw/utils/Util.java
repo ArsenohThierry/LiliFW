@@ -41,7 +41,13 @@ public class Util {
                     for (Method method : clazz.getDeclaredMethods()) {
                         if (method.isAnnotationPresent(UrlMapping.class)) {
                             String urlMethod = method.getAnnotation(UrlMapping.class).value();
-                            urlToMethods.putIfAbsent(urlMethod, new ControllerMethods(clazz.getName(), method));
+                            if (urlToMethods.containsKey(urlMethod)) {
+                                ControllerMethods existing = urlToMethods.get(urlMethod);
+                                throw new Exception("Conflit d'URL : '" + urlMethod + "' est deja utilise par "
+                                        + existing.getControllerName() + "." + existing.getMethode().getName()
+                                        + " et par " + clazz.getName() + "." + method.getName());
+                            }
+                            urlToMethods.put(urlMethod, new ControllerMethods(clazz.getName(), method));
                         }
                     }
                 }
