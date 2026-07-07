@@ -11,4 +11,5 @@ import java.lang.annotation.Target;
 
 public @interface UrlMapping {
       public String value();
+      public String method();
 }
