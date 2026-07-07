@@ -1,12 +1,8 @@
 package lilifw;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,7 +39,7 @@ public class FrontControllerServlet extends HttpServlet {
             processRequest(request, response);
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new ServletException(e.getMessage());
         }
     }
 
@@ -54,7 +50,7 @@ public class FrontControllerServlet extends HttpServlet {
             processRequest(request, response);
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new ServletException(e.getMessage());
         }
     }
 
@@ -90,6 +86,8 @@ public class FrontControllerServlet extends HttpServlet {
             request.getRequestDispatcher("/route.jsp").forward(request, response);
             return;
         }
+
+
 
         request.setAttribute("controllerName", foncDeURL.getControllerName());
         request.setAttribute("methodName", foncDeURL.getMethode().getName());
