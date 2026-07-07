@@ -15,7 +15,7 @@ public class Main {
         Map<String,ControllerMethods> contMethods = new HashMap<>();
         
         try {
-            Util.scanAllAnnotedControllers(url, contMethods);
+            // Util.scanAllAnnotedControllers(url, contMethods);
 
             for (String string : contMethods.keySet()) {
                 System.out.println("url: " + string + " ; ");

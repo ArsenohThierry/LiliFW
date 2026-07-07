@@ -15,7 +15,7 @@ import lilifw.annotation.UrlMapping;
 public class Util {
     // public static void scanAllAnnotedControllers(String
     // packageLocation,List<Class<?>> liste_controller) throws Exception{
-    public static void scanAllAnnotedControllers(String packageLocation, Map<String, ControllerMethods> urlToMethods)
+    public static void scanAllAnnotedControllers(String packageLocation, Map<URLMethod, ControllerMethods> urlToMethods)
             throws Exception {
 
         packageLocation = packageLocation.replace(".", "/") + "/controllers";
@@ -41,13 +41,17 @@ public class Util {
                     for (Method method : clazz.getDeclaredMethods()) {
                         if (method.isAnnotationPresent(UrlMapping.class)) {
                             String urlMethod = method.getAnnotation(UrlMapping.class).value();
-                            if (urlToMethods.containsKey(urlMethod)) {
-                                ControllerMethods existing = urlToMethods.get(urlMethod);
+                            String reqMethod = method.getAnnotation(UrlMapping.class).method();
+                            URLMethod reqUrlMethod = new URLMethod(urlMethod, reqMethod);
+                            
+                            if (urlToMethods.containsKey(reqUrlMethod)) {
+                                ControllerMethods existing = urlToMethods.get(reqUrlMethod);
                                 throw new Exception("Conflit d'URL : '" + urlMethod + "' est deja utilise par "
                                         + existing.getControllerName() + "." + existing.getMethode().getName()
                                         + " et par " + clazz.getName() + "." + method.getName());
                             }
-                            urlToMethods.put(urlMethod, new ControllerMethods(clazz.getName(), method));
+
+                            urlToMethods.put(reqUrlMethod, new ControllerMethods(clazz.getName(), method));
                         }
                     }
                 }
