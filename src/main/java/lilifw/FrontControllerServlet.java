@@ -10,27 +10,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import lilifw.utils.ControllerMethods;
 import lilifw.utils.ModelAndView;
 import lilifw.utils.URLMethod;
-import lilifw.utils.Util;
 
 public class FrontControllerServlet extends HttpServlet {
 
     // Map<String,List<Method>> listeMethodesAnnotes = new java.util.HashMap<>();
     // Map<String, ControllerMethods> urlToMethods = new HashMap<>();
-    Map<URLMethod, ControllerMethods> urlToMethods = new HashMap<>();
+    Map<URLMethod, ControllerMethods> urlToMethods;
 
+    @SuppressWarnings("unchecked")
     public void init() throws ServletException {
-
-        // recuperer le package contenant dans web.xml
-        String packageLocation = this.getInitParameter("package");
-
-        // scanner tous les controlleurs et chacune de leurs methodes dans le package
-        // controller puis mapper avec les url
-        try {
-            Util.scanAllAnnotedControllers(packageLocation, urlToMethods);
-        } catch (Exception e) {
-            // afficher un errur
-            throw new ServletException(e.getMessage());
-        }
+        urlToMethods = (Map<URLMethod, ControllerMethods>)
+            getServletContext().getAttribute("urlToMethods");
     }
 
     @Override
