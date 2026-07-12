@@ -3,7 +3,6 @@ package lilifw;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,7 +30,7 @@ public class FrontControllerServlet extends HttpServlet {
             processRequest(request, response);
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new ServletException(e.getMessage());
         }
     }
 
@@ -42,7 +41,7 @@ public class FrontControllerServlet extends HttpServlet {
             processRequest(request, response);
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new ServletException(e.getMessage());
         }
     }
 
@@ -80,6 +79,22 @@ public class FrontControllerServlet extends HttpServlet {
         }
 
 
+
+        Class<?> controllerClass = Class.forName(foncDeURL.getControllerName());
+        Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
+        Object result = foncDeURL.getMethode().invoke(controllerInstance);
+
+        if (result instanceof ModelAndView) {
+            ModelAndView mv = (ModelAndView) result;
+            for (Map.Entry<String, Object> entry : mv.getData().entrySet()) {
+                request.setAttribute(entry.getKey(), entry.getValue());
+            }
+            request.getRequestDispatcher("/" + mv.getView() + ".jsp").forward(request, response);
+        } else {
+            request.setAttribute("controllerName", foncDeURL.getControllerName());
+            request.setAttribute("methodName", foncDeURL.getMethode().getName());
+            request.getRequestDispatcher("/route.jsp").forward(request, response);
+        }
     }
 
     public Map<URLMethod, ControllerMethods> getUrlToMethods() {
