@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lilifw.utils.ControllerMethods;
+import lilifw.utils.ModelAndView;
 import lilifw.utils.URLMethod;
 import lilifw.utils.Util;
 
@@ -89,9 +90,21 @@ public class FrontControllerServlet extends HttpServlet {
 
 
 
-        request.setAttribute("controllerName", foncDeURL.getControllerName());
-        request.setAttribute("methodName", foncDeURL.getMethode().getName());
-        request.getRequestDispatcher("/route.jsp").forward(request, response);
+        Class<?> controllerClass = Class.forName(foncDeURL.getControllerName());
+        Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
+        Object result = foncDeURL.getMethode().invoke(controllerInstance);
+
+        if (result instanceof ModelAndView) {
+            ModelAndView mv = (ModelAndView) result;
+            for (Map.Entry<String, Object> entry : mv.getData().entrySet()) {
+                request.setAttribute(entry.getKey(), entry.getValue());
+            }
+            request.getRequestDispatcher("/" + mv.getView() + ".jsp").forward(request, response);
+        } else {
+            request.setAttribute("controllerName", foncDeURL.getControllerName());
+            request.setAttribute("methodName", foncDeURL.getMethode().getName());
+            request.getRequestDispatcher("/route.jsp").forward(request, response);
+        }
     }
 
     public Map<URLMethod, ControllerMethods> getUrlToMethods() {
