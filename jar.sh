@@ -5,7 +5,11 @@ rm -rf out
 mkdir -p out
 
 # Compilation
-javac -Xlint -cp "lib/servlet-api.jar" -d out $(find . -name "*.java")
+CLASSPATH="lib/servlet-api.jar"
+for jar in lib/*.jar; do
+    CLASSPATH="$CLASSPATH:$jar"
+done
+javac -Xlint -cp "$CLASSPATH" -d out $(find . -name "*.java")
 
 # Vérification
 if [ $? -ne 0 ]; then

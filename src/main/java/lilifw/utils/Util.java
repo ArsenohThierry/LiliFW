@@ -1,12 +1,8 @@
 package lilifw.utils;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.lang.reflect.Method;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 
 import lilifw.annotation.Controller;
@@ -22,7 +18,7 @@ public class Util {
         URL url = Thread.currentThread().getContextClassLoader().getResource(packageLocation);
 
         if (url == null) {
-            System.out.println("No controllers package found at: " + packageLocation);
+            System.out.println("Aucun controlleur trouve: " + packageLocation);
             return;
         }
 

@@ -1,39 +1,31 @@
 package lilifw;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+
+import org.springframework.context.ApplicationContext;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lilifw.utils.ControllerMethods;
+import lilifw.utils.ModelAndView;
+import lilifw.utils.SpringContextHolder;
 import lilifw.utils.URLMethod;
-import lilifw.utils.Util;
 
 public class FrontControllerServlet extends HttpServlet {
 
     // Map<String,List<Method>> listeMethodesAnnotes = new java.util.HashMap<>();
     // Map<String, ControllerMethods> urlToMethods = new HashMap<>();
-    Map<URLMethod, ControllerMethods> urlToMethods = new HashMap<>();
+    Map<URLMethod, ControllerMethods> urlToMethods;
+    ApplicationContext ctx;
 
+    @SuppressWarnings("unchecked")
     public void init() throws ServletException {
-
-        // recuperer le package contenant dans web.xml
-        String packageLocation = this.getInitParameter("package");
-
-        // scanner tous les controlleurs et chacune de leurs methodes dans le package
-        // controller puis mapper avec les url
-        try {
-            Util.scanAllAnnotedControllers(packageLocation, urlToMethods);
-        } catch (Exception e) {
-            // afficher un errur
-            throw new ServletException(e.getMessage());
-        }
+        urlToMethods = (Map<URLMethod, ControllerMethods>)
+            getServletContext().getAttribute("urlToMethods");
     }
 
     @Override
@@ -43,7 +35,7 @@ public class FrontControllerServlet extends HttpServlet {
             processRequest(request, response);
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new ServletException(e.getMessage());
         }
     }
 
@@ -54,7 +46,7 @@ public class FrontControllerServlet extends HttpServlet {
             processRequest(request, response);
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new ServletException(e.getMessage());
         }
     }
 
@@ -91,9 +83,24 @@ public class FrontControllerServlet extends HttpServlet {
             return;
         }
 
-        request.setAttribute("controllerName", foncDeURL.getControllerName());
-        request.setAttribute("methodName", foncDeURL.getMethode().getName());
-        request.getRequestDispatcher("/route.jsp").forward(request, response);
+
+
+        Class<?> controllerClass = Class.forName(foncDeURL.getControllerName());
+        Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
+        SpringContextHolder.get().getAutowireCapableBeanFactory().autowireBean(controllerInstance);
+        Object result = foncDeURL.getMethode().invoke(controllerInstance);
+
+        if (result instanceof ModelAndView) {
+            ModelAndView mv = (ModelAndView) result;
+            for (Map.Entry<String, Object> entry : mv.getData().entrySet()) {
+                request.setAttribute(entry.getKey(), entry.getValue());
+            }
+            request.getRequestDispatcher("/" + mv.getView() + ".jsp").forward(request, response);
+        } else {
+            request.setAttribute("controllerName", foncDeURL.getControllerName());
+            request.setAttribute("methodName", foncDeURL.getMethode().getName());
+            request.getRequestDispatcher("/route.jsp").forward(request, response);
+        }
     }
 
     public Map<URLMethod, ControllerMethods> getUrlToMethods() {
@@ -108,4 +115,8 @@ public class FrontControllerServlet extends HttpServlet {
     // return listeMethodesAnnotes;
     // }
 
+
+    public void setCtx(ApplicationContext context){
+        this.ctx = context;
+    }
 }
