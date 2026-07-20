@@ -18,7 +18,7 @@ public class Util {
         URL url = Thread.currentThread().getContextClassLoader().getResource(packageLocation);
 
         if (url == null) {
-            System.out.println("No controllers package found at: " + packageLocation);
+            System.out.println("Aucun controlleur trouve: " + packageLocation);
             return;
         }
 

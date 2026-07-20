@@ -3,12 +3,16 @@ package lilifw;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.springframework.context.ApplicationContext;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lilifw.utils.ControllerMethods;
 import lilifw.utils.ModelAndView;
+import lilifw.utils.SpringContextHolder;
 import lilifw.utils.URLMethod;
 
 public class FrontControllerServlet extends HttpServlet {
@@ -16,6 +20,7 @@ public class FrontControllerServlet extends HttpServlet {
     // Map<String,List<Method>> listeMethodesAnnotes = new java.util.HashMap<>();
     // Map<String, ControllerMethods> urlToMethods = new HashMap<>();
     Map<URLMethod, ControllerMethods> urlToMethods;
+    ApplicationContext ctx;
 
     @SuppressWarnings("unchecked")
     public void init() throws ServletException {
@@ -82,6 +87,7 @@ public class FrontControllerServlet extends HttpServlet {
 
         Class<?> controllerClass = Class.forName(foncDeURL.getControllerName());
         Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
+        SpringContextHolder.get().getAutowireCapableBeanFactory().autowireBean(controllerInstance);
         Object result = foncDeURL.getMethode().invoke(controllerInstance);
 
         if (result instanceof ModelAndView) {
@@ -109,4 +115,8 @@ public class FrontControllerServlet extends HttpServlet {
     // return listeMethodesAnnotes;
     // }
 
+
+    public void setCtx(ApplicationContext context){
+        this.ctx = context;
+    }
 }
