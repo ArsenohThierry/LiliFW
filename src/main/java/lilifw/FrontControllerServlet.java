@@ -7,20 +7,26 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.context.ApplicationContext;
+import org.springframework.web.context.support.WebApplicationContextUtils;
 import lilifw.utils.ControllerMethods;
 import lilifw.utils.ModelAndView;
 import lilifw.utils.URLMethod;
 
 public class FrontControllerServlet extends HttpServlet {
 
-    // Map<String,List<Method>> listeMethodesAnnotes = new java.util.HashMap<>();
-    // Map<String, ControllerMethods> urlToMethods = new HashMap<>();
     Map<URLMethod, ControllerMethods> urlToMethods;
+    private ApplicationContext ctx;
 
     @SuppressWarnings("unchecked")
     public void init() throws ServletException {
         urlToMethods = (Map<URLMethod, ControllerMethods>)
             getServletContext().getAttribute("urlToMethods");
+        try {
+            ctx = WebApplicationContextUtils.getRequiredWebApplicationContext(getServletContext());
+        } catch (Exception e) {
+            ctx = null;
+        }
     }
 
     @Override
@@ -30,7 +36,7 @@ public class FrontControllerServlet extends HttpServlet {
             processRequest(request, response);
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            throw new ServletException(e.getMessage());
+            throw new ServletException(e.getMessage(), e);
         }
     }
 
@@ -41,7 +47,7 @@ public class FrontControllerServlet extends HttpServlet {
             processRequest(request, response);
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            throw new ServletException(e.getMessage());
+            throw new ServletException(e.getMessage(), e);
         }
     }
 
@@ -82,7 +88,18 @@ public class FrontControllerServlet extends HttpServlet {
 
         Class<?> controllerClass = Class.forName(foncDeURL.getControllerName());
         Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
-        Object result = foncDeURL.getMethode().invoke(controllerInstance);
+
+        Class<?>[] parameterTypes = foncDeURL.getMethode().getParameterTypes();
+        Object[] parameters = new Object[parameterTypes.length];
+        for (int i = 0; i < parameterTypes.length; i++) {
+            if (parameterTypes[i].equals(ApplicationContext.class)) {
+                parameters[i] = ctx;
+            } else {
+                parameters[i] = null;
+            }
+        }
+
+        Object result = foncDeURL.getMethode().invoke(controllerInstance, parameters);
 
         if (result instanceof ModelAndView) {
             ModelAndView mv = (ModelAndView) result;
@@ -91,10 +108,19 @@ public class FrontControllerServlet extends HttpServlet {
             }
             request.getRequestDispatcher("/" + mv.getView() + ".jsp").forward(request, response);
         } else {
+            // Verifier si la methode appelee via le lien est Annote @WebAPI
+            if (true) {
+                
+            }
+
             request.setAttribute("controllerName", foncDeURL.getControllerName());
             request.setAttribute("methodName", foncDeURL.getMethode().getName());
             request.getRequestDispatcher("/route.jsp").forward(request, response);
         }
+
+        // Handle si C'est une methode REST (@WebAPI)
+        
+
     }
 
     public Map<URLMethod, ControllerMethods> getUrlToMethods() {

@@ -15,6 +15,14 @@ public class ModelAndView {
         this.view = view;
     }
 
+    public ModelAndView() {
+    }
+
+    public ModelAndView(String view, Object data) {
+        this.view = view;
+        this.data.put("data", data);
+    }
+
     public void addObject(String name, Object value) {
         data.put(name, value);
     }
