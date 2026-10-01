@@ -2,7 +2,6 @@ package lilifw;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -11,7 +10,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
-import lilifw.annotation.WebAPI;
 import lilifw.utils.ApiMethods;
 import lilifw.utils.ControllerMethods;
 import lilifw.utils.JsonSerializer;
@@ -20,15 +18,23 @@ import lilifw.utils.URLMethod;
 
 public class FrontControllerServlet extends HttpServlet {
 
-    Map<URLMethod, ControllerMethods> urlToMethods;
-    Map<URLMethod, ApiMethods> urlToApiMethods = new HashMap<>();
+    private static final long serialVersionUID = 1L;
 
-    private ApplicationContext ctx;
+    private transient Map<URLMethod, ControllerMethods> urlToMethods = new HashMap<>();
+    private transient Map<URLMethod, ApiMethods> urlToApiMethods = new HashMap<>();
+
+    private transient ApplicationContext ctx;
 
     @SuppressWarnings("unchecked")
     public void init() throws ServletException {
-        urlToMethods = (Map<URLMethod, ControllerMethods>) getServletContext().getAttribute("urlToMethods");
-        urlToApiMethods = (Map<URLMethod, ApiMethods>) getServletContext().getAttribute("urlToApiMethods");
+        Object urlToMethodsAttr = getServletContext().getAttribute("urlToMethods");
+        if (urlToMethodsAttr instanceof Map) {
+            urlToMethods = (Map<URLMethod, ControllerMethods>) urlToMethodsAttr;
+        }
+        Object urlToApiMethodsAttr = getServletContext().getAttribute("urlToApiMethods");
+        if (urlToApiMethodsAttr instanceof Map) {
+            urlToApiMethods = (Map<URLMethod, ApiMethods>) urlToApiMethodsAttr;
+        }
 
         try {
             ctx = WebApplicationContextUtils.getRequiredWebApplicationContext(getServletContext());
@@ -43,7 +49,6 @@ public class FrontControllerServlet extends HttpServlet {
         try {
             processRequest(request, response);
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             throw new ServletException(e.getMessage(), e);
         }
     }
@@ -54,7 +59,6 @@ public class FrontControllerServlet extends HttpServlet {
         try {
             processRequest(request, response);
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             throw new ServletException(e.getMessage(), e);
         }
     }
@@ -66,7 +70,7 @@ public class FrontControllerServlet extends HttpServlet {
         String contextPath = request.getContextPath();
         String url = uri.substring(contextPath.length());
 
-        if (url == null || url.equals("/")) {
+        if (url.equals("/")) {
             request.setAttribute("annotatedMethods", getUrlToMethods());
             request.getRequestDispatcher("/index.jsp").forward(request, response);
             return;
@@ -74,16 +78,14 @@ public class FrontControllerServlet extends HttpServlet {
 
         request.setAttribute("url", url);
 
-        // D'abord verifier si la methode existe dans urlToApiMethods
+        // Verifier d'abord si la methode existe dans urlToApiMethods (@WebAPI)
         ApiMethods foncApideURL = urlToApiMethods.get(new URLMethod(url, request.getMethod()));
         if (foncApideURL != null) {
-            // retourner du json
             try {
-                // Chargement de la classe pour prendre en compte ApplicationContext
                 Class<?> controllerClass = Class.forName(foncApideURL.getController());
                 Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
 
-                Class<?>[] parameterTypes = foncApideURL.getMethode().getParameterTypes();
+                Class<?>[] parameterTypes = foncApideURL.getMethod().getParameterTypes();
                 Object[] parameters = new Object[parameterTypes.length];
                 for (int i = 0; i < parameterTypes.length; i++) {
                     if (parameterTypes[i].equals(ApplicationContext.class)) {
@@ -93,10 +95,8 @@ public class FrontControllerServlet extends HttpServlet {
                     }
                 }
 
-                // invoker la methode API 
-                Object result = foncApideURL.getMethode().invoke(controllerInstance, parameters);
+                Object result = foncApideURL.getMethod().invoke(controllerInstance, parameters);
 
-                // verifier si le developpeur a mis true ou false dans le mode de retour JSON
                 if (foncApideURL.isToJson()) {
                     response.setContentType("application/json; charset=UTF-8");
                     response.getWriter().write(JsonSerializer.serialize(result));
@@ -110,10 +110,9 @@ public class FrontControllerServlet extends HttpServlet {
                 response.setContentType("application/json; charset=UTF-8");
                 response.getWriter().write("{\"error\": " + JsonSerializer.serialize(cause.getMessage()) + "}");
             }
-
         } else {
 
-            // c'est ici qu'on recupere la methode dans la map qu on invokera plus tard
+            // Verifier si la methode existe dans urlToMethods (@UrlMapping)
             ControllerMethods foncDeURL = urlToMethods.get(new URLMethod(url, request.getMethod()));
             if (foncDeURL == null) {
                 String prefix = url.substring(0, url.lastIndexOf('/'));
@@ -136,7 +135,7 @@ public class FrontControllerServlet extends HttpServlet {
             Class<?> controllerClass = Class.forName(foncDeURL.getControllerName());
             Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
 
-            Class<?>[] parameterTypes = foncDeURL.getMethode().getParameterTypes();
+            Class<?>[] parameterTypes = foncDeURL.getMethod().getParameterTypes();
             Object[] parameters = new Object[parameterTypes.length];
             for (int i = 0; i < parameterTypes.length; i++) {
                 if (parameterTypes[i].equals(ApplicationContext.class)) {
@@ -146,7 +145,7 @@ public class FrontControllerServlet extends HttpServlet {
                 }
             }
 
-            Object result = foncDeURL.getMethode().invoke(controllerInstance, parameters);
+            Object result = foncDeURL.getMethod().invoke(controllerInstance, parameters);
 
             if (result instanceof ModelAndView) {
                 ModelAndView mv = (ModelAndView) result;
@@ -156,23 +155,13 @@ public class FrontControllerServlet extends HttpServlet {
                 request.getRequestDispatcher("/" + mv.getView() + ".jsp").forward(request, response);
             } else {
                 request.setAttribute("controllerName", foncDeURL.getControllerName());
-                request.setAttribute("methodName", foncDeURL.getMethode().getName());
+                request.setAttribute("methodName", foncDeURL.getMethod().getName());
                 request.getRequestDispatcher("/route.jsp").forward(request, response);
             }
         }
-
     }
 
     public Map<URLMethod, ControllerMethods> getUrlToMethods() {
         return urlToMethods;
     }
-
-    // public Map<String, ControllerMethods> getUrlToMethods() {
-    // return urlToMethods;
-    // }
-
-    // public Map<String, List<Method>> getListeMethodesAnnotes() {
-    // return listeMethodesAnnotes;
-    // }
-
 }

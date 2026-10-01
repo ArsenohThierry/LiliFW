@@ -1,31 +1,29 @@
 package lilifw.utils;
 
-
 import java.lang.reflect.Method;
 
 public class ControllerMethods {
-    public String controllerName;
-    public Method Methode;
-    
-    public ControllerMethods(String controllerName, Method methode) {
+    private String controllerName;
+    private Method method;
+
+    public ControllerMethods(String controllerName, Method method) {
         this.controllerName = controllerName;
-        Methode = methode;
+        this.method = method;
     }
+
     public String getControllerName() {
         return controllerName;
     }
+
     public void setControllerName(String controllerName) {
         this.controllerName = controllerName;
     }
-    public Method getMethode() {
-        return Methode;
-    }
-    public void setMethode(Method methode) {
-        Methode = methode;
+
+    public Method getMethod() {
+        return method;
     }
 
-    public void print(){
-        System.out.println(getControllerName() + getMethode().getName());
+    public void setMethod(Method method) {
+        this.method = method;
     }
-    
 }
