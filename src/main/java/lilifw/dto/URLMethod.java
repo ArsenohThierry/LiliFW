@@ -1,4 +1,4 @@
-package lilifw.utils;
+package lilifw.dto;
 
 import java.util.Objects;
 
