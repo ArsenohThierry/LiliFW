@@ -2,7 +2,10 @@ package lilifw;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -104,7 +107,7 @@ public class FrontControllerServlet extends HttpServlet {
 
     private void handleApi(ApiMethods apiMethod, HttpServletRequest request, HttpServletResponse response) {
         try {
-            Object result = invokeControllerMethod(apiMethod.getController(), apiMethod.getMethod());
+            Object result = invokeControllerMethod(apiMethod.getController(), apiMethod.getMethod(), request);
             renderApiResult(result, apiMethod.isToJson(), response);
         } catch (Exception e) {
             sendApiError(e, response);
@@ -133,7 +136,7 @@ public class FrontControllerServlet extends HttpServlet {
 
     private void handleMvc(ControllerMethods mvcMethod, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
-        Object result = invokeControllerMethod(mvcMethod.getControllerName(), mvcMethod.getMethod());
+        Object result = invokeControllerMethod(mvcMethod.getControllerName(), mvcMethod.getMethod(), request);
 
         if (result instanceof ModelAndView) {
             ModelAndView mv = (ModelAndView) result;
@@ -167,17 +170,37 @@ public class FrontControllerServlet extends HttpServlet {
         request.getRequestDispatcher("/route.jsp").forward(request, response);
     }
 
-    private Object invokeControllerMethod(String controllerName, Method method) throws Exception {
+    private Object invokeControllerMethod(String controllerName, Method method, HttpServletRequest request)
+            throws Exception {
+
         Class<?> controllerClass = Class.forName(controllerName);
         Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
 
-        Class<?>[] parameterTypes = method.getParameterTypes();
-        Object[] parameters = new Object[parameterTypes.length];
-        for (int i = 0; i < parameterTypes.length; i++) {
-            if (parameterTypes[i].equals(ApplicationContext.class)) {
+        Parameter[] parametres = method.getParameters();
+
+        Object[] parameters = new Object[parametres.length];
+
+        for (int i = 0; i < parametres.length; i++) {
+
+            Parameter parameter = parametres[i];
+
+            String nomParametre = parameter.getName();
+            Class<?> type = parameter.getType();
+
+            // Paramètre fourni par Spring
+            if (type.equals(ApplicationContext.class)) {
                 parameters[i] = ctx;
-            } else {
-                parameters[i] = null;
+                continue;
+            }
+
+            // Paramètre fourni par la requête HTTP
+            String valeur = request.getParameter(nomParametre);
+
+            // Binding
+            if (type.equals(String.class)) {
+                parameters[i] = valeur;
+            } else if (type.equals(int.class)) {
+                parameters[i] = Integer.parseInt(valeur);
             }
         }
 

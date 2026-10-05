@@ -62,7 +62,7 @@ public class ControllerScanner {
             if (method.isAnnotationPresent(UrlMapping.class)) {
                 registerUrlMapping(clazz, method, mappings);
             } else if (method.isAnnotationPresent(WebAPI.class)) {
-                registerApiMapping(clazz, method, mappings);
+                enregistrerApiMethod(clazz, method, mappings);
             }
         }
     }
@@ -76,7 +76,7 @@ public class ControllerScanner {
         mappings.getUrlToMethods().put(urlMethod, new ControllerMethods(clazz.getName(), method));
     }
 
-    private void registerApiMapping(Class<?> clazz, Method method, UrlMappings mappings) throws Exception {
+    private void enregistrerApiMethod(Class<?> clazz, Method method, UrlMappings mappings) throws Exception {
         String url = method.getAnnotation(WebAPI.class).api();
         URLMethod urlMethod = new URLMethod(url, API_HTTP_METHOD);
         boolean toJson = method.getAnnotation(WebAPI.class).toJSON();
