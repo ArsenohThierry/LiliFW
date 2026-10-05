@@ -5,11 +5,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target(ElementType.METHOD) 
+@Target(ElementType.METHOD)
 
-@Retention(RetentionPolicy.RUNTIME) 
+@Retention(RetentionPolicy.RUNTIME)
 
 public @interface WebAPI {
       public String api();
-      public boolean toJSON();
+      public boolean toJSON() default true;
 }
