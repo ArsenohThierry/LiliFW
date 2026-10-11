@@ -3,9 +3,7 @@ package lilifw;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -19,6 +17,7 @@ import lilifw.dto.ControllerMethods;
 import lilifw.dto.ModelAndView;
 import lilifw.dto.URLMethod;
 import lilifw.utils.JsonSerializer;
+import lilifw.utils.ModelBinder;
 
 public class FrontControllerServlet extends HttpServlet {
 
@@ -170,40 +169,46 @@ public class FrontControllerServlet extends HttpServlet {
         request.getRequestDispatcher("/route.jsp").forward(request, response);
     }
 
+    private final ModelBinder modelBinder = new ModelBinder();
+
     private Object invokeControllerMethod(String controllerName, Method method, HttpServletRequest request)
             throws Exception {
 
         Class<?> controllerClass = Class.forName(controllerName);
         Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
+        method.setAccessible(true);
 
         Parameter[] parametres = method.getParameters();
-
-        Object[] parameters = new Object[parametres.length];
+        Object[] args = new Object[parametres.length];
 
         for (int i = 0; i < parametres.length; i++) {
-
             Parameter parameter = parametres[i];
-
-            String nomParametre = parameter.getName();
             Class<?> type = parameter.getType();
 
-            // Paramètre fourni par Spring
-            if (type.equals(ApplicationContext.class)) {
-                parameters[i] = ctx;
-                continue;
-            }
-
-            // Paramètre fourni par la requête HTTP
-            String valeur = request.getParameter(nomParametre);
-
-            // Binding
-            if (type.equals(String.class)) {
-                parameters[i] = valeur;
-            } else if (type.equals(int.class)) {
-                parameters[i] = Integer.parseInt(valeur);
+            if (ApplicationContext.class.isAssignableFrom(type)) {
+                args[i] = ctx;
+            } else if (isObjet(type)) {
+                args[i] = modelBinder.bind(type, request);
+            } else {
+                String value = request.getParameter(parameter.getName());
+                args[i] = modelBinder.convert(value, type, parameter.getName());
             }
         }
 
-        return method.invoke(controllerInstance, parameters);
+        return method.invoke(controllerInstance, args);
+    }
+
+    private boolean isObjet(Class<?> type) {
+        return !type.isPrimitive()
+                && !type.equals(String.class)
+                && !type.equals(Integer.class)
+                && !type.equals(Long.class)
+                && !type.equals(Double.class)
+                && !type.equals(Boolean.class)
+                && !type.equals(Float.class)
+                && !type.equals(Short.class)
+                && !type.equals(Byte.class)
+                && !type.isEnum()
+                && !type.equals(ApplicationContext.class);
     }
 }

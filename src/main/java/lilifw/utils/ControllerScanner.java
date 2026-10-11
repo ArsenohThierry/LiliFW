@@ -17,20 +17,20 @@ import lilifw.dto.UrlMappings;
 
 public class ControllerScanner {
 
-    private static final String CONTROLLERS_SUFFIX = "/controllers";
+    private static final String PACKAGE_CONTROLLEURS = "/controllers";
     private static final String API_HTTP_METHOD = "GET";
 
     public UrlMappings scan(String packageLocation) throws Exception {
         UrlMappings mappings = new UrlMappings();
         for (Class<?> clazz : findControllerClasses(packageLocation)) {
-            registerMappings(clazz, mappings);
+            enregistrerMappings(clazz, mappings);
         }
         return mappings;
     }
 
     private List<Class<?>> findControllerClasses(String packageLocation) throws Exception {
         List<Class<?>> controllerClasses = new ArrayList<>();
-        String resourcePath = packageLocation.replace(".", "/") + CONTROLLERS_SUFFIX;
+        String resourcePath = packageLocation.replace(".", "/") + PACKAGE_CONTROLLEURS;
         URL url = Thread.currentThread().getContextClassLoader().getResource(resourcePath);
 
         if (url == null) {
@@ -57,22 +57,22 @@ public class ControllerScanner {
         return controllerClasses;
     }
 
-    private void registerMappings(Class<?> clazz, UrlMappings mappings) throws Exception {
+    private void enregistrerMappings(Class<?> clazz, UrlMappings mappings) throws Exception {
         for (Method method : clazz.getDeclaredMethods()) {
             if (method.isAnnotationPresent(UrlMapping.class)) {
-                registerUrlMapping(clazz, method, mappings);
+                enregisterUrlMapping(clazz, method, mappings);
             } else if (method.isAnnotationPresent(WebAPI.class)) {
                 enregistrerApiMethod(clazz, method, mappings);
             }
         }
     }
 
-    private void registerUrlMapping(Class<?> clazz, Method method, UrlMappings mappings) throws Exception {
+    private void enregisterUrlMapping(Class<?> clazz, Method method, UrlMappings mappings) throws Exception {
         String url = method.getAnnotation(UrlMapping.class).value();
         String httpMethod = method.getAnnotation(UrlMapping.class).method();
         URLMethod urlMethod = new URLMethod(url, httpMethod);
 
-        assertNoConflict(urlMethod, clazz, method, mappings);
+        verifierDoublons(urlMethod, clazz, method, mappings);
         mappings.getUrlToMethods().put(urlMethod, new ControllerMethods(clazz.getName(), method));
     }
 
@@ -81,11 +81,11 @@ public class ControllerScanner {
         URLMethod urlMethod = new URLMethod(url, API_HTTP_METHOD);
         boolean toJson = method.getAnnotation(WebAPI.class).toJSON();
 
-        assertNoConflict(urlMethod, clazz, method, mappings);
+        verifierDoublons(urlMethod, clazz, method, mappings);
         mappings.getUrlToApiMethods().put(urlMethod, new ApiMethods(clazz.getName(), method, toJson));
     }
 
-    private void assertNoConflict(URLMethod urlMethod, Class<?> clazz, Method method, UrlMappings mappings)
+    private void verifierDoublons(URLMethod urlMethod, Class<?> clazz, Method method, UrlMappings mappings)
             throws Exception {
         ControllerMethods existingMvc = mappings.getUrlToMethods().get(urlMethod);
         if (existingMvc != null) {
