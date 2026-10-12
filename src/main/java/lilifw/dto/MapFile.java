@@ -1,11 +1,9 @@
 package lilifw.dto;
 
 public class MapFile {
-    String nom;
-    String extension;
-    byte[] data;
-
-    
+    private String nom;
+    private String extension;
+    private byte[] data;
 
     public MapFile() {
     }
@@ -16,11 +14,10 @@ public class MapFile {
         this.data = data;
     }
 
-    public String getNom() {return nom;}
-    public void setNom(String nom) {this.nom = nom;}
-    public String getExtension() {return extension;}
-    public void setExtension(String extension) {this.extension = extension;}
-    public byte[] getData() {return data;}
-    public void setData(byte[] data) {this.data = data;}
-    
+    public String getNom() { return nom; }
+    public void setNom(String nom) { this.nom = nom; }
+    public String getExtension() { return extension; }
+    public void setExtension(String extension) { this.extension = extension; }
+    public byte[] getData() { return data; }
+    public void setData(byte[] data) { this.data = data; }
 }

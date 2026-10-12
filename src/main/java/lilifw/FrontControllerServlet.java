@@ -177,7 +177,6 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
     private final ModelBinder modelBinder = new ModelBinder();
-    private final FileBinder fileBinder = new FileBinder();
 
     private Object invokeControllerMethod(String controllerName, Method method, HttpServletRequest request)
             throws Exception {
@@ -196,15 +195,10 @@ public class FrontControllerServlet extends HttpServlet {
             if (ApplicationContext.class.isAssignableFrom(type)) {
                 args[i] = ctx;
             } else if (isMapFile(type)) {
-
-                // args[i] = fileBinder.bind(type, request);
-
+                args[i] = modelBinder.bindFile(parameter.getName(), request);
             } else if (isObjet(type)) {
-
                 args[i] = modelBinder.bind(type, request);
-
             } else {
-                // Veirfier si MapFile seulement
                 String value = request.getParameter(parameter.getName());
                 args[i] = modelBinder.convert(value, type, parameter.getName());
             }
@@ -224,6 +218,7 @@ public class FrontControllerServlet extends HttpServlet {
                 && !type.equals(Short.class)
                 && !type.equals(Byte.class)
                 && !type.isEnum()
+                && !MapFile.class.equals(type)
                 && !type.equals(ApplicationContext.class);
     }
 

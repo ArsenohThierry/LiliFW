@@ -3,6 +3,8 @@ package lilifw.utils;
 import java.lang.reflect.Field;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Part;
+import lilifw.dto.MapFile;
 
 public class ModelBinder {
 
@@ -10,18 +12,59 @@ public class ModelBinder {
         Object target = type.getDeclaredConstructor().newInstance();
 
         for (Field field : type.getDeclaredFields()) {
-            String value = request.getParameter(field.getName());
-            if (value == null) {
-                continue;
-            }
-
             field.setAccessible(true);
-            field.set(target, convert(value, field.getType(), field.getName()));
+            Class<?> fieldType = field.getType();
 
-
+            if (MapFile.class.equals(fieldType)) {
+                MapFile mf = bindFile(field.getName(), request);
+                if (mf != null) {
+                    field.set(target, mf);
+                }
+            } else if (isPojo(fieldType)) {
+                field.set(target, bind(fieldType, request));
+            } else {
+                String value = request.getParameter(field.getName());
+                if (value != null) {
+                    field.set(target, convert(value, fieldType, field.getName()));
+                }
+            }
         }
 
         return target;
+    }
+
+    public MapFile bindFile(String fieldName, HttpServletRequest request) throws Exception {
+        String ct = request.getContentType();
+        if (ct == null || !ct.toLowerCase().startsWith("multipart/")) {
+            return null;
+        }
+        Part part = request.getPart(fieldName);
+        if (part == null) {
+            return null;
+        }
+        String nom = part.getSubmittedFileName();
+        if (nom == null || nom.isEmpty()) {
+            return null;
+        }
+        String ext = nom.contains(".") ? nom.substring(nom.lastIndexOf('.') + 1) : "";
+        return new MapFile(nom, ext, part.getInputStream().readAllBytes());
+    }
+
+    private boolean isPojo(Class<?> type) {
+        if (type.isPrimitive()) return false;
+        if (type.isEnum()) return false;
+        if (type.isArray()) return false;
+        if (type.equals(String.class)) return false;
+        if (type.equals(Integer.class) || type.equals(int.class)) return false;
+        if (type.equals(Long.class) || type.equals(long.class)) return false;
+        if (type.equals(Double.class) || type.equals(double.class)) return false;
+        if (type.equals(Boolean.class) || type.equals(boolean.class)) return false;
+        if (type.equals(Float.class) || type.equals(float.class)) return false;
+        if (type.equals(Short.class) || type.equals(short.class)) return false;
+        if (type.equals(Byte.class) || type.equals(byte.class)) return false;
+        if (type.equals(Character.class) || type.equals(char.class)) return false;
+        if (MapFile.class.equals(type)) return false;
+        return true;
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
