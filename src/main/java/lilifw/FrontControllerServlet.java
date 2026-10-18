@@ -186,6 +186,7 @@ public class FrontControllerServlet extends HttpServlet {
         method.setAccessible(true);
 
         Parameter[] parametres = method.getParameters();
+
         Object[] args = new Object[parametres.length];
 
         for (int i = 0; i < parametres.length; i++) {
@@ -195,7 +196,7 @@ public class FrontControllerServlet extends HttpServlet {
             if (ApplicationContext.class.isAssignableFrom(type)) {
                 args[i] = ctx;
             } else if (isMapFile(type)) {
-                args[i] = modelBinder.bindFile(parameter.getName(), request);
+                args[i] = modelBinder.bindFichier(parameter.getName(), request);
             } else if (isObjet(type)) {
                 args[i] = modelBinder.bind(type, request);
             } else {

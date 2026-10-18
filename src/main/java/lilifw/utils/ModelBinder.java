@@ -16,11 +16,11 @@ public class ModelBinder {
             Class<?> fieldType = field.getType();
 
             if (MapFile.class.equals(fieldType)) {
-                MapFile mf = bindFile(field.getName(), request);
+                MapFile mf = bindFichier(field.getName(), request);
                 if (mf != null) {
                     field.set(target, mf);
                 }
-            } else if (isPojo(fieldType)) {
+            } else if (isObjet(fieldType)) {
                 field.set(target, bind(fieldType, request));
             } else {
                 String value = request.getParameter(field.getName());
@@ -33,12 +33,12 @@ public class ModelBinder {
         return target;
     }
 
-    public MapFile bindFile(String fieldName, HttpServletRequest request) throws Exception {
+    public MapFile bindFichier(String nomAttribut, HttpServletRequest request) throws Exception {
         String ct = request.getContentType();
         if (ct == null || !ct.toLowerCase().startsWith("multipart/")) {
             return null;
         }
-        Part part = request.getPart(fieldName);
+        Part part = request.getPart(nomAttribut);
         if (part == null) {
             return null;
         }
@@ -50,7 +50,9 @@ public class ModelBinder {
         return new MapFile(nom, ext, part.getInputStream().readAllBytes());
     }
 
-    private boolean isPojo(Class<?> type) {
+
+    
+    private boolean isObjet(Class<?> type) {
         if (type.isPrimitive()) return false;
         if (type.isEnum()) return false;
         if (type.isArray()) return false;
