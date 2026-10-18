@@ -6,19 +6,26 @@ import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
+
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
 import lilifw.dto.ApiMethods;
 import lilifw.dto.ControllerMethods;
+
 import lilifw.dto.ModelAndView;
 import lilifw.dto.URLMethod;
+import lilifw.dto.MapFile;
+import lilifw.utils.FileBinder;
 import lilifw.utils.JsonSerializer;
 import lilifw.utils.ModelBinder;
 
+@MultipartConfig
 public class FrontControllerServlet extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
@@ -109,7 +116,7 @@ public class FrontControllerServlet extends HttpServlet {
             Object result = invokeControllerMethod(apiMethod.getController(), apiMethod.getMethod(), request);
             renderApiResult(result, apiMethod.isToJson(), response);
         } catch (Exception e) {
-            sendApiError(e, response);
+            retournerAPIError(e, response);
         }
     }
 
@@ -123,7 +130,7 @@ public class FrontControllerServlet extends HttpServlet {
         }
     }
 
-    private void sendApiError(Exception e, HttpServletResponse response) {
+    private void retournerAPIError(Exception e, HttpServletResponse response) {
         Throwable cause = e.getCause() != null ? e.getCause() : e;
         try {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -179,6 +186,7 @@ public class FrontControllerServlet extends HttpServlet {
         method.setAccessible(true);
 
         Parameter[] parametres = method.getParameters();
+
         Object[] args = new Object[parametres.length];
 
         for (int i = 0; i < parametres.length; i++) {
@@ -187,6 +195,8 @@ public class FrontControllerServlet extends HttpServlet {
 
             if (ApplicationContext.class.isAssignableFrom(type)) {
                 args[i] = ctx;
+            } else if (isMapFile(type)) {
+                args[i] = modelBinder.bindFichier(parameter.getName(), request);
             } else if (isObjet(type)) {
                 args[i] = modelBinder.bind(type, request);
             } else {
@@ -209,6 +219,11 @@ public class FrontControllerServlet extends HttpServlet {
                 && !type.equals(Short.class)
                 && !type.equals(Byte.class)
                 && !type.isEnum()
+                && !MapFile.class.equals(type)
                 && !type.equals(ApplicationContext.class);
+    }
+
+    private boolean isMapFile(Class<?> type) {
+        return type.equals(MapFile.class);
     }
 }
