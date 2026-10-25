@@ -249,7 +249,8 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
     private Session getUpdatedSession(HttpServletRequest request) {
-        Session session = new Session();
+        Session session = (Session)getServletContext().getAttribute("Session");
+
         HttpSession httpSession = request.getSession(false);
         if (httpSession == null) {
             return session;
@@ -282,7 +283,7 @@ public class FrontControllerServlet extends HttpServlet {
             }
         }
         for (String nom : aSupprimer) {
-            httpSession.removeAttribute(nom);
+            session.removeFromHttpSession(nom, httpSession);
         }
 
         for (Map.Entry<String, Object> entry : attributs.entrySet()) {

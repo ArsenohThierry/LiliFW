@@ -3,6 +3,8 @@ package lilifw.dto;
 import java.util.HashMap;
 import java.util.Map;
 
+import jakarta.servlet.http.HttpSession;
+
 public class Session {
     Map<String, Object> sessionAttributs;
     
@@ -22,11 +24,19 @@ public class Session {
         sessionAttributs.remove(key);
     }
 
+    public void removeFromHttpSession(String key, HttpSession session){
+        session.removeAttribute(key);
+    }
+
     public Map<String, Object> getSessionAttributs() {
         return sessionAttributs;
     }
 
     public void setSessionAttributs(Map<String, Object> sessionAttributs) {
         this.sessionAttributs = sessionAttributs;
+    }
+
+    public String[] getAllSessionAttributes() {
+        return sessionAttributs.keySet().toArray(new String[0]);
     }
 }

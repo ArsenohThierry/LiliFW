@@ -3,6 +3,7 @@ package lilifw;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
+import lilifw.dto.Session;
 import lilifw.dto.UrlMappings;
 import lilifw.utils.ControllerScanner;
 
@@ -13,6 +14,8 @@ public class LiliFWContextListener implements ServletContextListener {
         ServletContext context = event.getServletContext();
         String packageLocation = context.getInitParameter("package");
 
+        
+        context.setAttribute("Session", new Session());
         try {
             UrlMappings mappings = new ControllerScanner().scan(packageLocation);
             context.setAttribute("urlToMethods", mappings.getUrlToMethods());
