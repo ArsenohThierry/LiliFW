@@ -3,14 +3,17 @@ package lilifw;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.Part;
+import jakarta.servlet.http.HttpSession;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
@@ -19,9 +22,9 @@ import lilifw.dto.ApiMethods;
 import lilifw.dto.ControllerMethods;
 
 import lilifw.dto.ModelAndView;
+import lilifw.dto.Session;
 import lilifw.dto.URLMethod;
 import lilifw.dto.MapFile;
-import lilifw.utils.FileBinder;
 import lilifw.utils.JsonSerializer;
 import lilifw.utils.ModelBinder;
 
@@ -189,12 +192,19 @@ public class FrontControllerServlet extends HttpServlet {
 
         Object[] args = new Object[parametres.length];
 
+        Session session = null;
+
         for (int i = 0; i < parametres.length; i++) {
             Parameter parameter = parametres[i];
             Class<?> type = parameter.getType();
 
             if (ApplicationContext.class.isAssignableFrom(type)) {
                 args[i] = ctx;
+            } else if (isSession(type)) {
+
+                session = getUpdatedSession(request);
+                args[i] = session;
+
             } else if (isMapFile(type)) {
                 args[i] = modelBinder.bindFichier(parameter.getName(), request);
             } else if (isObjet(type)) {
@@ -205,7 +215,13 @@ public class FrontControllerServlet extends HttpServlet {
             }
         }
 
-        return method.invoke(controllerInstance, args);
+        Object resultat = method.invoke(controllerInstance, args);
+
+        if (session != null) {
+            updateSession(request, session);
+        }
+
+        return resultat;
     }
 
     private boolean isObjet(Class<?> type) {
@@ -220,10 +236,58 @@ public class FrontControllerServlet extends HttpServlet {
                 && !type.equals(Byte.class)
                 && !type.isEnum()
                 && !MapFile.class.equals(type)
+                && !Session.class.equals(type)
                 && !type.equals(ApplicationContext.class);
     }
 
     private boolean isMapFile(Class<?> type) {
         return type.equals(MapFile.class);
+    }
+
+    private boolean isSession(Class<?> type) {
+        return type.equals(Session.class);
+    }
+
+    private Session getUpdatedSession(HttpServletRequest request) {
+        Session session = (Session)getServletContext().getAttribute("Session");
+
+        HttpSession httpSession = request.getSession(false);
+        if (httpSession == null) {
+            return session;
+        }
+        Enumeration<String> attributs = httpSession.getAttributeNames();
+        while (attributs.hasMoreElements()) {
+            String nomAttribut = attributs.nextElement();
+            session.set(nomAttribut, httpSession.getAttribute(nomAttribut));
+        }
+        return session;
+    }
+
+    private void updateSession(HttpServletRequest request, Session session) {
+        Map<String, Object> attributs = session.getSessionAttributs();
+
+        HttpSession httpSession = request.getSession(false);
+        if (httpSession == null) {
+            if (attributs.isEmpty()) {
+                return;
+            }
+            httpSession = request.getSession();
+        }
+
+        List<String> aSupprimer = new ArrayList<>();
+        Enumeration<String> existants = httpSession.getAttributeNames();
+        while (existants.hasMoreElements()) {
+            String nom = existants.nextElement();
+            if (!attributs.containsKey(nom)) {
+                aSupprimer.add(nom);
+            }
+        }
+        for (String nom : aSupprimer) {
+            session.removeFromHttpSession(nom, httpSession);
+        }
+
+        for (Map.Entry<String, Object> entry : attributs.entrySet()) {
+            httpSession.setAttribute(entry.getKey(), entry.getValue());
+        }
     }
 }
