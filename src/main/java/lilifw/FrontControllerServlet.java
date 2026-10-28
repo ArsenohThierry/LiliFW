@@ -18,6 +18,7 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
+import lilifw.annotation.Auth;
 import lilifw.dto.ApiMethods;
 import lilifw.dto.ControllerMethods;
 
@@ -114,11 +115,53 @@ public class FrontControllerServlet extends HttpServlet {
         request.getRequestDispatcher("/index.jsp").forward(request, response);
     }
 
-    private void handleApi(ApiMethods apiMethod, HttpServletRequest request, HttpServletResponse response) {
+    private boolean isAuthenticated(HttpServletRequest request) {
+        String authSessionAttribut = (String) getServletContext().getAttribute("authSessionParameter");
+        if (authSessionAttribut == null || authSessionAttribut.isEmpty()) {
+            authSessionAttribut = "user";
+        }
+
+        HttpSession httpSession = request.getSession(false);
+        if (httpSession == null) {
+            return false;
+        }
+
+        Object value = httpSession.getAttribute(authSessionAttribut);
+        if (value == null) {
+            return false;
+        }
+
+        if (value instanceof String) {
+            String strValue = (String) value;
+            if (strValue.isEmpty()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void handleApi(ApiMethods apiMethod, HttpServletRequest request, HttpServletResponse response)
+            throws Exception {
+        Method method = apiMethod.getMethod();
+        if (method.isAnnotationPresent(Auth.class)) {
+            if (!isAuthenticated(request)) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
+                return;
+            }
+        }
+
         try {
-            Object result = invokeControllerMethod(apiMethod.getController(), apiMethod.getMethod(), request);
+            Object result = invokeControllerMethod(apiMethod.getController(), method, request);
             renderApiResult(result, apiMethod.isToJson(), response);
         } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof jakarta.servlet.ServletException && ((jakarta.servlet.ServletException) cause).getRootCause() == null) {
+                throw (jakarta.servlet.ServletException) cause;
+            }
+            if (cause instanceof org.apache.catalina.connector.ClientAbortException) {
+                throw e;
+            }
             retournerAPIError(e, response);
         }
     }
@@ -145,7 +188,15 @@ public class FrontControllerServlet extends HttpServlet {
 
     private void handleMvc(ControllerMethods mvcMethod, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
-        Object result = invokeControllerMethod(mvcMethod.getControllerName(), mvcMethod.getMethod(), request);
+        Method method = mvcMethod.getMethod();
+        if (method.isAnnotationPresent(Auth.class)) {
+            if (!isAuthenticated(request)) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
+                return;
+            }
+        }
+
+        Object result = invokeControllerMethod(mvcMethod.getControllerName(), method, request);
 
         if (result instanceof ModelAndView) {
             ModelAndView mv = (ModelAndView) result;
@@ -162,7 +213,11 @@ public class FrontControllerServlet extends HttpServlet {
 
     private void handleNotFound(HttpServletRequest request, HttpServletResponse response, String url)
             throws ServletException, IOException {
-        String prefix = url.substring(0, url.lastIndexOf('/'));
+        String prefix = url;
+        int lastSlash = url.lastIndexOf('/');
+        if (lastSlash >= 0) {
+            prefix = url.substring(0, lastSlash);
+        }
         if (prefix.isEmpty()) {
             prefix = "/";
         }
@@ -200,6 +255,7 @@ public class FrontControllerServlet extends HttpServlet {
 
             if (ApplicationContext.class.isAssignableFrom(type)) {
                 args[i] = ctx;
+
             } else if (isSession(type)) {
 
                 session = getUpdatedSession(request);
@@ -249,7 +305,7 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
     private Session getUpdatedSession(HttpServletRequest request) {
-        Session session = (Session)getServletContext().getAttribute("Session");
+        Session session = (Session) getServletContext().getAttribute("Session");
 
         HttpSession httpSession = request.getSession(false);
         if (httpSession == null) {
