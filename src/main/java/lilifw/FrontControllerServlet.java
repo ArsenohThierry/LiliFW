@@ -62,8 +62,13 @@ public class FrontControllerServlet extends HttpServlet {
             throws ServletException, IOException {
         try {
             processRequest(request, response);
+        } catch (ServletException | IOException e) {
+            // On laisse passer telle quelle : Tomcat affichera sa page d'erreur
+            // (et reconnait notamment ClientAbortException, qui est un IOException).
+            throw e;
         } catch (Exception e) {
-            throw new ServletException(e.getMessage(), e);
+            // On ne "consomme" pas l'exception : Tomcat affiche son propre ecran.
+            throw new ServletException(e);
         }
     }
 
@@ -72,8 +77,13 @@ public class FrontControllerServlet extends HttpServlet {
             throws ServletException, IOException {
         try {
             processRequest(request, response);
+        } catch (ServletException | IOException e) {
+            // On laisse passer telle quelle : Tomcat affichera sa page d'erreur
+            // (et reconnait notamment ClientAbortException, qui est un IOException).
+            throw e;
         } catch (Exception e) {
-            throw new ServletException(e.getMessage(), e);
+            // On ne "consomme" pas l'exception : Tomcat affiche son propre ecran.
+            throw new ServletException(e);
         }
     }
 
@@ -144,11 +154,9 @@ public class FrontControllerServlet extends HttpServlet {
     private void handleApi(ApiMethods apiMethod, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         Method method = apiMethod.getMethod();
-        if (method.isAnnotationPresent(Auth.class)) {
-            if (!isAuthenticated(request)) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
-                return;
-            }
+        if (isAuthDenied(method, request)) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
+            return;
         }
 
         try {
@@ -156,14 +164,43 @@ public class FrontControllerServlet extends HttpServlet {
             renderApiResult(result, apiMethod.isToJson(), response);
         } catch (Exception e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            if (cause instanceof jakarta.servlet.ServletException && ((jakarta.servlet.ServletException) cause).getRootCause() == null) {
-                throw (jakarta.servlet.ServletException) cause;
-            }
-            if (cause instanceof org.apache.catalina.connector.ClientAbortException) {
+
+            // Client deconnecte (ClientAbortException chez Tomcat) ou reponse deja
+            // envoyee : on ne peut plus ecrire d'erreur, on laisse Tomcat gerer.
+            if (isClientAbort(cause) || response.isCommitted()) {
                 throw e;
             }
+
+            if (cause instanceof ServletException && ((ServletException) cause).getRootCause() == null) {
+                throw (ServletException) cause;
+            }
+
             retournerAPIError(e, response);
         }
+    }
+
+    /**
+     * Detecte une deconnexion du client sans referencer directement une classe
+     * propre a Tomcat (org.apache.catalina.connector.ClientAbortException).
+     *
+     * Cette classe ne fait pas partie de l'API Servlet (servlet-api.jar) : la
+     * comparer par son nom permet de compiler le framework sans ajouter
+     * catalina.jar au classpath, et donc de rester portable.
+     */
+    private boolean isClientAbort(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String className = current.getClass().getName();
+            if ("org.apache.catalina.connector.ClientAbortException".equals(className)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isAuthDenied(Method method, HttpServletRequest request) {
+        return method.isAnnotationPresent(Auth.class) && !isAuthenticated(request);
     }
 
     private void renderApiResult(Object result, boolean toJson, HttpServletResponse response) throws Exception {
@@ -189,11 +226,9 @@ public class FrontControllerServlet extends HttpServlet {
     private void handleMvc(ControllerMethods mvcMethod, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         Method method = mvcMethod.getMethod();
-        if (method.isAnnotationPresent(Auth.class)) {
-            if (!isAuthenticated(request)) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
-                return;
-            }
+        if (isAuthDenied(method, request)) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
+            return;
         }
 
         Object result = invokeControllerMethod(mvcMethod.getControllerName(), method, request);
