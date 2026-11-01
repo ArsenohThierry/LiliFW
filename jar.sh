@@ -21,5 +21,5 @@ mv lilifw.jar output
 rm ../TEST_liliFW/lib/lilifw.jar
 cp output/lilifw.jar ../TEST_liliFW/lib/
 
-echo "JAR créé : lilifw.jar"
+echo "Code compiled successfully"
 rm -rf out

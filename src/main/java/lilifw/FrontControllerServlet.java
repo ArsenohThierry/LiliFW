@@ -18,6 +18,7 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
+import lilifw.annotation.Auth;
 import lilifw.dto.ApiMethods;
 import lilifw.dto.ControllerMethods;
 
@@ -61,8 +62,13 @@ public class FrontControllerServlet extends HttpServlet {
             throws ServletException, IOException {
         try {
             processRequest(request, response);
+        } catch (ServletException | IOException e) {
+            // On laisse passer telle quelle : Tomcat affichera sa page d'erreur
+            // (et reconnait notamment ClientAbortException, qui est un IOException).
+            throw e;
         } catch (Exception e) {
-            throw new ServletException(e.getMessage(), e);
+            // On ne "consomme" pas l'exception : Tomcat affiche son propre ecran.
+            throw new ServletException(e);
         }
     }
 
@@ -71,8 +77,13 @@ public class FrontControllerServlet extends HttpServlet {
             throws ServletException, IOException {
         try {
             processRequest(request, response);
+        } catch (ServletException | IOException e) {
+            // On laisse passer telle quelle : Tomcat affichera sa page d'erreur
+            // (et reconnait notamment ClientAbortException, qui est un IOException).
+            throw e;
         } catch (Exception e) {
-            throw new ServletException(e.getMessage(), e);
+            // On ne "consomme" pas l'exception : Tomcat affiche son propre ecran.
+            throw new ServletException(e);
         }
     }
 
@@ -114,13 +125,82 @@ public class FrontControllerServlet extends HttpServlet {
         request.getRequestDispatcher("/index.jsp").forward(request, response);
     }
 
-    private void handleApi(ApiMethods apiMethod, HttpServletRequest request, HttpServletResponse response) {
+    private boolean isAuthenticated(HttpServletRequest request) {
+        String authSessionAttribut = (String) getServletContext().getAttribute("authSessionParameter");
+        if (authSessionAttribut == null || authSessionAttribut.isEmpty()) {
+            authSessionAttribut = "user";
+        }
+
+        HttpSession httpSession = request.getSession(false);
+        if (httpSession == null) {
+            return false;
+        }
+
+        Object value = httpSession.getAttribute(authSessionAttribut);
+        if (value == null) {
+            return false;
+        }
+
+        if (value instanceof String) {
+            String strValue = (String) value;
+            if (strValue.isEmpty()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void handleApi(ApiMethods apiMethod, HttpServletRequest request, HttpServletResponse response)
+            throws Exception {
+        Method method = apiMethod.getMethod();
+        if (isAuthDenied(method, request)) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
+            return;
+        }
+
         try {
-            Object result = invokeControllerMethod(apiMethod.getController(), apiMethod.getMethod(), request);
+            Object result = invokeControllerMethod(apiMethod.getController(), method, request);
             renderApiResult(result, apiMethod.isToJson(), response);
         } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+
+            // Client deconnecte (ClientAbortException chez Tomcat) ou reponse deja
+            // envoyee : on ne peut plus ecrire d'erreur, on laisse Tomcat gerer.
+            if (isClientAbort(cause) || response.isCommitted()) {
+                throw e;
+            }
+
+            if (cause instanceof ServletException && ((ServletException) cause).getRootCause() == null) {
+                throw (ServletException) cause;
+            }
+
             retournerAPIError(e, response);
         }
+    }
+
+    /**
+     * Detecte une deconnexion du client sans referencer directement une classe
+     * propre a Tomcat (org.apache.catalina.connector.ClientAbortException).
+     *
+     * Cette classe ne fait pas partie de l'API Servlet (servlet-api.jar) : la
+     * comparer par son nom permet de compiler le framework sans ajouter
+     * catalina.jar au classpath, et donc de rester portable.
+     */
+    private boolean isClientAbort(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String className = current.getClass().getName();
+            if ("org.apache.catalina.connector.ClientAbortException".equals(className)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isAuthDenied(Method method, HttpServletRequest request) {
+        return method.isAnnotationPresent(Auth.class) && !isAuthenticated(request);
     }
 
     private void renderApiResult(Object result, boolean toJson, HttpServletResponse response) throws Exception {
@@ -145,7 +225,13 @@ public class FrontControllerServlet extends HttpServlet {
 
     private void handleMvc(ControllerMethods mvcMethod, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
-        Object result = invokeControllerMethod(mvcMethod.getControllerName(), mvcMethod.getMethod(), request);
+        Method method = mvcMethod.getMethod();
+        if (isAuthDenied(method, request)) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
+            return;
+        }
+
+        Object result = invokeControllerMethod(mvcMethod.getControllerName(), method, request);
 
         if (result instanceof ModelAndView) {
             ModelAndView mv = (ModelAndView) result;
@@ -162,7 +248,11 @@ public class FrontControllerServlet extends HttpServlet {
 
     private void handleNotFound(HttpServletRequest request, HttpServletResponse response, String url)
             throws ServletException, IOException {
-        String prefix = url.substring(0, url.lastIndexOf('/'));
+        String prefix = url;
+        int lastSlash = url.lastIndexOf('/');
+        if (lastSlash >= 0) {
+            prefix = url.substring(0, lastSlash);
+        }
         if (prefix.isEmpty()) {
             prefix = "/";
         }
@@ -200,6 +290,7 @@ public class FrontControllerServlet extends HttpServlet {
 
             if (ApplicationContext.class.isAssignableFrom(type)) {
                 args[i] = ctx;
+
             } else if (isSession(type)) {
 
                 session = getUpdatedSession(request);
@@ -249,7 +340,7 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
     private Session getUpdatedSession(HttpServletRequest request) {
-        Session session = (Session)getServletContext().getAttribute("Session");
+        Session session = (Session) getServletContext().getAttribute("Session");
 
         HttpSession httpSession = request.getSession(false);
         if (httpSession == null) {
