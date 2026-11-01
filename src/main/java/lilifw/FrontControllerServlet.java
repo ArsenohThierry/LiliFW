@@ -1,13 +1,17 @@
 package lilifw;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.HttpServlet;
@@ -128,7 +132,7 @@ public class FrontControllerServlet extends HttpServlet {
     private boolean isAuthenticated(HttpServletRequest request) {
         String authSessionAttribut = (String) getServletContext().getAttribute("authSessionParameter");
         if (authSessionAttribut == null || authSessionAttribut.isEmpty()) {
-            authSessionAttribut = "user";
+            authSessionAttribut = "userAuthSession";
         }
 
         HttpSession httpSession = request.getSession(false);
@@ -151,11 +155,100 @@ public class FrontControllerServlet extends HttpServlet {
         return true;
     }
 
+    private boolean hasPermission(Method method, HttpServletRequest request) {
+        Auth auth = method.getAnnotation(Auth.class);
+
+        // Pas de @Auth 
+        if (auth == null) {
+            return true;
+        }
+
+        // @Auth : il faut au minimum etre connecte.
+        if (!isAuthenticated(request)) {
+            return false;
+        }
+
+        String requiredRole = auth.role();
+
+        // @Auth sans role : tout utilisateur connecte suffit.
+        if (requiredRole == null || requiredRole.isBlank()) {
+            return true;
+        }
+
+        HttpSession httpSession = request.getSession(false);
+        if (httpSession == null) {
+            return false;
+        }
+
+        String roleSessionAttribute = (String) getServletContext().getAttribute("roleSessionParameter");
+        if (roleSessionAttribute == null || roleSessionAttribute.isBlank()) {
+            roleSessionAttribute = "role";
+        }
+
+        Object sessionRole = httpSession.getAttribute(roleSessionAttribute);
+        return matchesRole(sessionRole, requiredRole);
+    }
+
+    private boolean matchesRole(Object sessionRole, String requiredRole) {
+        if (sessionRole == null || requiredRole == null) {
+            return false;
+        }
+
+        Set<String> userRoles = extractRoles(sessionRole);
+
+        // L'annotation peut contenir plusieurs roles : @Auth(role = "USER,ADMIN").
+        // On accepte si l'utilisateur possede AU MOINS UN des roles demandes.
+        for (String required : requiredRole.split(",")) {
+            String normalized = required.trim().toUpperCase();
+            if (!normalized.isEmpty() && userRoles.contains(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Set<String> extractRoles(Object value) {
+        Set<String> roles = new HashSet<>();
+        if (value == null) {
+            return roles;
+        }
+
+        if (value instanceof String) {
+            for (String role : ((String) value).split(",")) {
+                addRole(roles, role);
+            }
+        } else if (value instanceof Collection<?>) {
+            for (Object role : (Collection<?>) value) {
+                if (role != null) {
+                    addRole(roles, role.toString());
+                }
+            }
+        } else if (value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            for (int i = 0; i < length; i++) {
+                Object role = Array.get(value, i);
+                if (role != null) {
+                    addRole(roles, role.toString());
+                }
+            }
+        } else {
+            addRole(roles, value.toString());
+        }
+
+        return roles;
+    }
+
+    private void addRole(Set<String> roles, String role) {
+        if (role != null && !role.isBlank()) {
+            roles.add(role.trim().toUpperCase());
+        }
+    }
+
     private void handleApi(ApiMethods apiMethod, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         Method method = apiMethod.getMethod();
-        if (isAuthDenied(method, request)) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
+        if (!hasPermission(method, request)) {
+            deny(request, response);
             return;
         }
 
@@ -199,8 +292,14 @@ public class FrontControllerServlet extends HttpServlet {
         return false;
     }
 
-    private boolean isAuthDenied(Method method, HttpServletRequest request) {
-        return method.isAnnotationPresent(Auth.class) && !isAuthenticated(request);
+    private void deny(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (isAuthenticated(request)) {
+            // Connecte mais role insuffisant.
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Role insuffisant");
+        } else {
+            // Pas connecte.
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authentification requise");
+        }
     }
 
     private void renderApiResult(Object result, boolean toJson, HttpServletResponse response) throws Exception {
@@ -226,8 +325,8 @@ public class FrontControllerServlet extends HttpServlet {
     private void handleMvc(ControllerMethods mvcMethod, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         Method method = mvcMethod.getMethod();
-        if (isAuthDenied(method, request)) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Methode Non autorise");
+        if (!hasPermission(method, request)) {
+            deny(request, response);
             return;
         }
 

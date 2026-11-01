@@ -16,9 +16,13 @@ public class LiliFWContextListener implements ServletContextListener {
         
         // Pour gerer les authentifications : le framework lit si cette variable est stocke en session
         String authSessionParameter = context.getInitParameter("authSession");
-        
+        String roleSessionParameter = context.getInitParameter("roleSession");
+
         if (authSessionParameter != null) {
             context.setAttribute("authSessionParameter", authSessionParameter);
+        }
+        if (roleSessionParameter != null) {
+            context.setAttribute("roleSessionParameter", roleSessionParameter);
         }
         
         context.setAttribute("Session", new Session());
